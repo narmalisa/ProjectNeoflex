@@ -1,0 +1,95 @@
+CREATE OR REPLACE PROCEDURE ds.fill_account_turnover_f(IN i_OnDate DATE)
+LANGUAGE plpgsql AS $$
+BEGIN
+    -- Удаляем записи за указанную дату
+    DELETE FROM "DM".DM_ACCOUNT_TURNOVER_F WHERE ON_DATE = i_OnDate;
+
+    -- Логируем начало расчета
+    INSERT INTO "LOGS".TURNOVER_LOG (START_MESSAGE, START_TIME)
+    VALUES (format('Начало расчета витрины оборотов за %s', i_OnDate), NOW());
+
+    WITH turnover_data AS (
+        SELECT
+            CASE 
+                WHEN p."CREDIT_ACCOUNT_RK" IS NOT NULL THEN p."CREDIT_ACCOUNT_RK"
+                ELSE p."DEBET_ACCOUNT_RK"
+            END AS account_rk,
+            SUM(COALESCE(p."CREDIT_AMOUNT", 0)) AS credit_amount,
+            SUM(COALESCE(p."CREDIT_AMOUNT", 0)) * COALESCE(e."REDUCED_COURCE", 1) AS credit_amount_rub,
+            SUM(COALESCE(p."DEBET_AMOUNT", 0)) AS debet_amount,
+            SUM(COALESCE(p."DEBET_AMOUNT", 0)) * COALESCE(e."REDUCED_COURCE", 1) AS debet_amount_rub
+        FROM
+            "DS"."FT_POSTING_F" p
+        LEFT JOIN
+            "DS"."MD_EXCHANGE_RATE_D" e ON e."DATA_ACTUAL_DATE" = i_OnDate
+        WHERE
+            p."OPER_DATE" = i_OnDate
+        GROUP BY
+            account_rk
+    )
+    INSERT INTO "DM".DM_ACCOUNT_TURNOVER_F (ON_DATE, ACCOUNT_RK, CREDIT_AMOUNT, CREDIT_AMOUNT_RUB, DEBET_AMOUNT, DEBET_AMOUNT_RUB)
+    SELECT 
+        i_OnDate, 
+        account_rk, 
+        credit_amount, 
+        credit_amount_rub, 
+        debet_amount, 
+        debet_amount_rub
+    FROM turnover_data;
+
+    -- Логируем окончание расчета
+    INSERT INTO "LOGS".TURNOVER_LOG (END_MESSAGE, END_TIME)
+    VALUES (format('Конец расчета витрины оборотов за %s', i_OnDate), NOW());
+EXCEPTION
+    WHEN OTHERS THEN
+        INSERT INTO "LOGS".TURNOVER_LOG (END_MESSAGE, END_TIME, ERROR_MESSAGE)
+        VALUES (format('Ошибка расчета витрины оборотов за %s', i_OnDate), NOW(), SQLERRM);
+END;
+$$
+;
+
+DO $$
+DECLARE
+    current_date_ DATE := '2018-01-01'; -- Начальная дата
+BEGIN
+    WHILE current_date_ <= '2018-01-31' LOOP
+        -- Вызов процедуры для расчета витрины оборотов за текущую дату
+        CALL ds.fill_account_turnover_f(current_date_);
+        
+        -- Переход к следующему дню
+        current_date_ := current_date_ + INTERVAL '1 day';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE ds.fill_account_balance_f() LANGUAGE plpgsql AS $$ 
+DECLARE
+    start_time TIMESTAMP WITH TIME ZONE := CURRENT_TIMESTAMP;
+    end_time TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Удаление старых записей
+    DELETE FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = '2017-12-31';
+
+    -- Логирование начала расчета
+    INSERT INTO "LOGS"."turnover_log" (start_message, start_time)
+    VALUES ('Начало расчета витрины остатков за 31.12.2017', start_time);
+
+    -- Расчет витрины остатков
+    INSERT INTO "DM".DM_ACCOUNT_BALANCE_F (on_date, account_rk, balance_out, balance_out_rub)
+    SELECT 
+        '2017-12-31' AS on_date,
+        fb."ACCOUNT_RK",
+        fb."BALANCE_OUT",
+        fb."BALANCE_OUT" * COALESCE(er."REDUCED_COURCE", 1) AS balance_out_rub
+    FROM 
+        "DS"."FT_BALANCE_F" fb
+    LEFT JOIN 
+        "DS"."MD_EXCHANGE_RATE_D" er ON er."DATA_ACTUAL_DATE" = '2017-12-31';
+
+    -- Логирование окончания расчета
+    end_time := CURRENT_TIMESTAMP;
+    INSERT INTO "LOGS"."turnover_log" (end_message, end_time)
+    VALUES ('Окончание расчета витрины остатков за 31.12.2017', end_time);
+END;
+$$;
+
+call ds.fill_account_balance_f() 

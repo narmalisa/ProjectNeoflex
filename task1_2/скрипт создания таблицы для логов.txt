@@ -1,0 +1,7 @@
+create table if not exists "LOGS".turnover_log(
+	start_message text,
+	start_time timestamptz,
+	end_message text,
+	end_time timestamptz,
+	error_message text
+);
