@@ -43,7 +43,5 @@ create table if not exists "DM".DM_ACCOUNT_BALANCE_F(
 	on_date date not null,
 	account_rk int not null,
 	balance_out float,
-	balance_out_rub float,
-
-	PRIMARY KEY (ON_DATE, ACCOUNT_RK)
+	balance_out_rub float
 );
