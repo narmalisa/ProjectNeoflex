@@ -6,5 +6,5 @@
 
  	1.2
   	Ссылка на видео:
-   	https://drive.google.com/uc?id=14QRoZoc1q1uOjj_hWBNjy8GDTafR8ZiO&export=download
+   	https://drive.google.com/file/d/14QRoZoc1q1uOjj_hWBNjy8GDTafR8ZiO/view?usp=drive_link
 
