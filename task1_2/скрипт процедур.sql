@@ -28,7 +28,25 @@ BEGIN
     WHERE 
         ft."OPER_DATE" = i_OnDate
     GROUP BY 
-        ft."CREDIT_ACCOUNT_RK";
+        ft."CREDIT_ACCOUNT_RK"
+		
+	UNION ALL
+
+	SELECT 
+        i_OnDate,
+        ft."DEBET_ACCOUNT_RK" AS ACCOUNT_RK,
+        SUM(ft."CREDIT_AMOUNT") AS CREDIT_AMOUNT,
+        SUM(ft."CREDIT_AMOUNT") * COALESCE(MIN(er."REDUCED_COURCE"), 1) AS CREDIT_AMOUNT_RUB,
+        SUM(ft."DEBET_AMOUNT") AS DEBET_AMOUNT,
+        SUM(ft."DEBET_AMOUNT") * COALESCE(MIN(er."REDUCED_COURCE"), 1) AS DEBET_AMOUNT_RUB
+    FROM 
+        "DS"."FT_POSTING_F" ft
+    LEFT JOIN 
+        "DS"."MD_EXCHANGE_RATE_D" er ON er."DATA_ACTUAL_DATE" = i_OnDate
+    WHERE 
+        ft."OPER_DATE" = i_OnDate
+    GROUP BY 
+        ft."DEBET_ACCOUNT_RK";
 
    -- Логирование окончания работы
    UPDATE "LOGS".turnover_log
@@ -181,3 +199,13 @@ BEGIN
 
     RAISE NOTICE 'Расчет витрины остатков завершен за период с % по %', start_date, end_date;
 END $$;
+
+
+
+
+
+
+
+
+
+
