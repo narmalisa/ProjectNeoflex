@@ -3,7 +3,8 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_log_id INT;
-    v_FromDate DATE := DATE_TRUNC('month', i_OnDate) - INTERVAL '1 MONTH'; -- последний день предыдущего месяца
+    v_BeforeDate DATE := DATE_TRUNC('month', i_OnDate) - INTERVAL '1 MONTH' - INTERVAL '1 DAY'; -- день перед отчетным периодом
+    v_FromDate DATE := DATE_TRUNC('month', i_OnDate) - INTERVAL '1 MONTH'; -- первый день отчетного периода
     v_ToDate DATE := (DATE_TRUNC('month', v_FromDate) + INTERVAL '1 month') - INTERVAL '1 day'; -- последний день отчетного периода
 BEGIN 
     -- Логирование начала работы
@@ -41,52 +42,55 @@ BEGIN
         SUBSTRING("DS"."MD_ACCOUNT_D"."ACCOUNT_NUMBER", 1, 5) AS LEDGER_ACCOUNT,
         "DS"."MD_ACCOUNT_D"."CHAR_TYPE" AS CHARACTERSTIC,
 
-        -- Остатки на день перед отчетным периодом (рублевые счета)
+       -- Остатки на день перед отчетным периодом (рублевые счета)
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" IN ('810', '643') THEN 
-            balance_rub.BALANCE_OUT_RUB
+            COALESCE((SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_BeforeDate 
+            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK), 0)
             ELSE 0 END) AS BALANCE_IN_RUB,
 
         -- Остатки на день перед отчетным периодом (все кроме рублевых)
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" NOT IN ('810', '643') THEN 
-            balance_rub.BALANCE_OUT_RUB
+            COALESCE((SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_BeforeDate
+            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK), 0)
             ELSE 0 END) AS BALANCE_IN_VAL,
 
         -- Остатки на день перед отчетным периодом (все)
-        SUM(balance_rub.BALANCE_OUT_RUB) AS BALANCE_IN_TOTAL,
+        SUM(COALESCE((SELECT balance_out_rub FROM "DM".DM_ACCOUNT_BALANCE_F WHERE on_date = v_BeforeDate
+            AND account_rk = balance_rub.ACCOUNT_RK), 0)) AS BALANCE_IN_TOTAL,
 
         -- Дебетовые обороты за отчетный период
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" IN ('810', '643') THEN 
-            turnover.debet_amount_rub ELSE 0 END) AS TURN_DEB_RUB,
+            COALESCE(turnover.debet_amount_rub, 0) ELSE 0 END) AS TURN_DEB_RUB,
 
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" NOT IN ('810', '643') THEN 
-            turnover.debet_amount_rub ELSE 0 END) AS TURN_DEB_VAL,
+            COALESCE(turnover.debet_amount_rub, 0) ELSE 0 END) AS TURN_DEB_VAL,
 
-        SUM(turnover.debet_amount_rub) AS TURN_DEB_TOTAL,
+        SUM(COALESCE(turnover.debet_amount_rub, 0)) AS TURN_DEB_TOTAL,
 
         -- Кредитовые обороты за отчетный период
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" IN ('810', '643') THEN 
-            turnover.credit_amount_rub ELSE 0 END) AS TURN_CRE_RUB,
+            COALESCE(turnover.credit_amount_rub, 0) ELSE 0 END) AS TURN_CRE_RUB,
 
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" NOT IN ('810', '643') THEN 
-            turnover.credit_amount_rub ELSE 0 END) AS TURN_CRE_VAL,
+            COALESCE(turnover.credit_amount_rub, 0) ELSE 0 END) AS TURN_CRE_VAL,
 
-        SUM(turnover.credit_amount_rub) AS TURN_CRE_TOTAL,
+        SUM(COALESCE(turnover.credit_amount_rub, 0)) AS TURN_CRE_TOTAL,
 
         -- Остатки на последний день отчетного периода (рублевые счета)
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" IN ('810', '643') THEN 
-            (SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_ToDate 
-            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK)
+            COALESCE((SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_ToDate 
+            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK), 0)
             ELSE 0 END) AS BALANCE_OUT_RUB,
 
         -- Остатки на последний день отчетного периода (все кроме рублевых)
         SUM(CASE WHEN "DS"."MD_ACCOUNT_D"."CURRENCY_CODE" NOT IN ('810', '643') THEN 
-            (SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_ToDate
-            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK)
+            COALESCE((SELECT BALANCE_OUT_RUB FROM "DM".DM_ACCOUNT_BALANCE_F WHERE ON_DATE = v_ToDate
+            AND ACCOUNT_RK = balance_rub.ACCOUNT_RK), 0)
             ELSE 0 END) AS BALANCE_OUT_VAL,
 
         -- Остатки на последний день отчетного периода (все)
-        SUM((SELECT balance_out_rub FROM "DM".DM_ACCOUNT_BALANCE_F WHERE on_date = v_ToDate
-            AND account_rk = balance_rub.ACCOUNT_RK)) AS BALANCE_OUT_TOTAL
+        SUM(COALESCE((SELECT balance_out_rub FROM "DM".DM_ACCOUNT_BALANCE_F WHERE on_date = v_ToDate
+            AND account_rk = balance_rub.ACCOUNT_RK), 0)) AS BALANCE_OUT_TOTAL
 
     FROM 
        "DM".DM_ACCOUNT_BALANCE_F balance_rub
