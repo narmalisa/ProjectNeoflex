@@ -15,3 +15,9 @@
  	1.4
   	Ccылка на видео:
    	https://drive.google.com/file/d/1y1vkiXqB_xvacQlWmteiFPKi58KnSDdb/view?usp=sharing
+
+    	Задание 2
+
+    	2.1
+     	Ссылка на видео:
+      	https://drive.google.com/file/d/1LZXMtyqziuaf5nSKqNGC1gauoLAHhlZp/view?usp=drive_link
