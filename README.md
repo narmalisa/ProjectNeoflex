@@ -25,3 +25,7 @@
        2.2
        Ссылка на видео:
        https://drive.google.com/file/d/1Dssu7l8pRiqi1OtgwkZJjmSpAElqrpPY/view?usp=drive_link
+
+       2.3
+       Ссылка на видео:
+	https://drive.google.com/file/d/1rJ7rQNwAFqjNtaj_S9GPkbcK_gA3TZBA/view?usp=drive_link
